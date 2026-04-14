@@ -93,24 +93,39 @@ class _HomeScreenState extends State<HomeScreen> {
     final String? storedData = prefs.getString('my_wheels_list_v2');
 
     if (storedData != null) {
-      List<dynamic> decoded = jsonDecode(storedData);
-      setState(() {
-        wheels = decoded.map((e) => WheelModel.fromMap(e)).toList();
-        isLoading = false;
-      });
+      try {
+        final List<dynamic> decoded = jsonDecode(storedData);
+        if (!mounted) return;
+        setState(() {
+          wheels = decoded.map((e) => WheelModel.fromMap(e)).toList();
+          isLoading = false;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          wheels = _defaultWheels();
+          isLoading = false;
+        });
+        _saveWheels();
+      }
     } else {
       // СОЗДАЕМ ПРЕСЕТЫ ПРИ ПЕРВОМ ЗАПУСКЕ
+      if (!mounted) return;
       setState(() {
-        wheels = [
-          WheelModel(id: '1', title: '🍕 Что поесть?', items: ['Пицца', 'Суши', 'Бургер', 'Салат', 'Шаурма'], colorIndex: 0),
-          WheelModel(id: '2', title: '🔥 Правда или Действие', items: ['Расскажи секрет', 'Поцелуй соседа', 'Выпей шот', 'Станцуй', 'Сними одну вещь'], colorIndex: 2),
-          WheelModel(id: '3', title: '🍓 Для пары (18+)', items: ['Массаж 5 мин', 'Поцелуй в шею', 'Шлепок', 'Укус', 'Стриптиз'], colorIndex: 1),
-          WheelModel(id: '4', title: '🎬 Что посмотреть', items: ['Ужастик', 'Комедия', 'Боевик', 'Аниме', 'Драма'], colorIndex: 3),
-        ];
+        wheels = _defaultWheels();
         isLoading = false;
       });
       _saveWheels();
     }
+  }
+
+  List<WheelModel> _defaultWheels() {
+    return [
+      WheelModel(id: '1', title: '🍕 Что поесть?', items: ['Пицца', 'Суши', 'Бургер', 'Салат', 'Шаурма'], colorIndex: 0),
+      WheelModel(id: '2', title: '🔥 Правда или Действие', items: ['Расскажи секрет', 'Поцелуй соседа', 'Выпей шот', 'Станцуй', 'Сними одну вещь'], colorIndex: 2),
+      WheelModel(id: '3', title: '🍓 Для пары (18+)', items: ['Массаж 5 мин', 'Поцелуй в шею', 'Шлепок', 'Укус', 'Стриптиз'], colorIndex: 1),
+      WheelModel(id: '4', title: '🎬 Что посмотреть', items: ['Ужастик', 'Комедия', 'Боевик', 'Аниме', 'Драма'], colorIndex: 3),
+    ];
   }
 
   Future<void> _saveWheels() async {
@@ -162,6 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(builder: (context) => GameScreen(wheel: wheel)),
     );
+    if (!mounted) return;
     setState(() {}); // Обновляем UI
     _saveWheels();   // Сохраняем изменения в базу
   }
@@ -455,8 +471,25 @@ class _EditScreenState extends State<EditScreen> {
   }
 
   void _save() {
-    widget.wheel.title = _titleController.text;
-    widget.wheel.items = _controllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+    final title = _titleController.text.trim();
+    final items = _controllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Название не может быть пустым')),
+      );
+      return;
+    }
+
+    if (items.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Добавьте минимум 2 варианта')),
+      );
+      return;
+    }
+
+    widget.wheel.title = title;
+    widget.wheel.items = items;
     Navigator.pop(context);
   }
 
@@ -501,7 +534,12 @@ class _EditScreenState extends State<EditScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.redAccent),
-                    onPressed: () => setState(() => _controllers.removeAt(index)),
+                    onPressed: () {
+                      if (_controllers.length == 1) return;
+                      final controller = _controllers.removeAt(index);
+                      controller.dispose();
+                      setState(() {});
+                    },
                   ),
                 ],
               ),
