@@ -96,8 +96,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const String _wheelsKey = 'my_wheels_list_v2';
+  static const String _totalSpinsKey = 'stats_total_spins';
+  static const String _lastResultKey = 'stats_last_result';
+  static const String _welcomeShownKey = 'stats_welcome_seen';
+
   List<WheelModel> wheels = [];
   bool isLoading = true;
+  int totalSpins = 0;
+  String? lastResult;
 
   @override
   void initState() {
@@ -107,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadWheels() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? storedData = prefs.getString('my_wheels_list_v2');
+    final String? storedData = prefs.getString(_wheelsKey);
 
     if (storedData != null) {
       try {
@@ -115,12 +122,16 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!mounted) return;
         setState(() {
           wheels = decoded.map((e) => WheelModel.fromMap(e)).toList();
+          totalSpins = prefs.getInt(_totalSpinsKey) ?? 0;
+          lastResult = prefs.getString(_lastResultKey);
           isLoading = false;
         });
       } catch (_) {
         if (!mounted) return;
         setState(() {
           wheels = _defaultWheels();
+          totalSpins = prefs.getInt(_totalSpinsKey) ?? 0;
+          lastResult = prefs.getString(_lastResultKey);
           isLoading = false;
         });
         _saveWheels();
@@ -130,9 +141,16 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         wheels = _defaultWheels();
+        totalSpins = prefs.getInt(_totalSpinsKey) ?? 0;
+        lastResult = prefs.getString(_lastResultKey);
         isLoading = false;
       });
       _saveWheels();
+    }
+
+    final bool hasSeenWelcome = prefs.getBool(_welcomeShownKey) ?? false;
+    if (!hasSeenWelcome && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showWelcomeSheet());
     }
   }
 
@@ -148,7 +166,65 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _saveWheels() async {
     final prefs = await SharedPreferences.getInstance();
     final String encoded = jsonEncode(wheels.map((e) => e.toMap()).toList());
-    await prefs.setString('my_wheels_list_v2', encoded);
+    await prefs.setString(_wheelsKey, encoded);
+  }
+
+  Future<void> _loadStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      totalSpins = prefs.getInt(_totalSpinsKey) ?? 0;
+      lastResult = prefs.getString(_lastResultKey);
+    });
+  }
+
+  Future<void> _showWelcomeSheet() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_welcomeShownKey, true);
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111827),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Добро пожаловать в Bottle+ 🎉',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Быстрый старт:\n1) Выбери готовое колесо\n2) Нажми «КРУТИТЬ»\n3) Поделись результатом с друзьями',
+                style: TextStyle(color: Colors.white70, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFC857),
+                  ),
+                  child: const Text(
+                    'Погнали',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _addNewWheel() {
@@ -197,6 +273,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() {}); // Обновляем UI
     _saveWheels();   // Сохраняем изменения в базу
+    _loadStats();
+  }
+
+  void _spinRandomWheel() {
+    if (wheels.isEmpty) return;
+    final wheel = wheels[Random().nextInt(wheels.length)];
+    _openGameScreen(wheel);
   }
 
   @override
@@ -205,57 +288,42 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(title: const Text('Bottle+ 🎡')),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.85,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
-              itemCount: wheels.length + 1,
-              itemBuilder: (context, index) {
-                // КНОПКА ДОБАВИТЬ
-                if (index == wheels.length) {
-                  return InkWell(
-                    onTap: _addNewWheel,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white12, width: 2, style: BorderStyle.solid),
+          : Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Всего прокрутов: $totalSpins', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (lastResult != null) ...[
+                        const SizedBox(height: 6),
+                        Text('Последний результат: $lastResult', style: const TextStyle(color: Colors.white70)),
+                      ],
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _spinRandomWheel,
+                        icon: const Icon(Icons.casino),
+                        label: const Text('Случайное колесо'),
                       ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add, size: 40, color: Color(0xFF4FB0C6)),
-                          SizedBox(height: 8),
-                          Text("Создать", style: TextStyle(color: Color(0xFF4FB0C6), fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                // КАРТОЧКА КОЛЕСА
-                final wheel = wheels[index];
-                final colors = [Colors.orange, Colors.purpleAccent, Colors.redAccent, Colors.blueAccent, Colors.greenAccent];
-                final color = colors[wheel.colorIndex % colors.length];
-
-                return InkWell(
-                  onTap: () => _openGameScreen(wheel),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        colors: [color.withOpacity(0.2), color.withOpacity(0.05)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      border: Border.all(color: color.withOpacity(0.5), width: 1),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.85,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,25 +339,70 @@ class _HomeScreenState extends State<HomeScreen> {
                               onTap: () => _deleteWheel(index),
                               child: const Icon(Icons.delete_outline, size: 20, color: Colors.white30),
                             ),
-                          ],
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add, size: 40, color: Color(0xFF4FB0C6)),
+                                SizedBox(height: 8),
+                                Text("Создать", style: TextStyle(color: Color(0xFF4FB0C6), fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      // КАРТОЧКА КОЛЕСА
+                      final wheel = wheels[index];
+                      final colors = [Colors.orange, Colors.purpleAccent, Colors.redAccent, Colors.blueAccent, Colors.greenAccent];
+                      final color = colors[wheel.colorIndex % colors.length];
+
+                      return InkWell(
+                        onTap: () => _openGameScreen(wheel),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: LinearGradient(
+                              colors: [color.withOpacity(0.2), color.withOpacity(0.05)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(color: color.withOpacity(0.5), width: 1),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Icon(Icons.donut_large, color: color),
+                                  GestureDetector(
+                                    onTap: () => _deleteWheel(index),
+                                    child: const Icon(Icons.delete_outline, size: 20, color: Colors.white30),
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              Text(
+                                wheel.title,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "${wheel.items.length} вариантов",
+                                style: const TextStyle(fontSize: 12, color: Colors.white54),
+                              ),
+                            ],
+                          ),
                         ),
-                        const Spacer(),
-                        Text(
-                          wheel.title,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "${wheel.items.length} вариантов",
-                          style: const TextStyle(fontSize: 12, color: Colors.white54),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
     );
   }
@@ -776,6 +889,22 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  Future<void> _completeSpin(String result) async {
+    _recentResults.insert(0, result);
+    if (_recentResults.length > 5) {
+      _recentResults.removeLast();
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final spins = (prefs.getInt(_totalSpinsKey) ?? 0) + 1;
+    await prefs.setInt(_totalSpinsKey, spins);
+    await prefs.setString(_lastResultKey, result);
+
+    if (!mounted) return;
+    setState(() {});
+    _showResultDialog(result);
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _activeItems;
@@ -921,6 +1050,22 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 ),
               ),
+              if (_recentResults.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      const Text('Последние результаты:', style: TextStyle(color: Colors.white70)),
+                      for (final result in _recentResults)
+                        Chip(
+                          label: Text(result),
+                          backgroundColor: Colors.white10,
+                        ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 20),
             ],
           ),
