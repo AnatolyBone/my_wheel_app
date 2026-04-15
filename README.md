@@ -1,16 +1,77 @@
-# my_wheel_app
+# Bottle+ 🎡
 
-A new Flutter project.
+Интерактивное Flutter-приложение с «колесами выбора» для вечеринок, пар и повседневных решений.
 
-## Getting Started
+## Что внутри
 
-This project is a starting point for a Flutter application.
+- Готовые пресеты (еда, фильмы, party, 18+).
+- Создание своих колес и редактирование вариантов.
+- Эффектный экран вращения (анимация, конфетти, вибрация).
+- Быстрый онбординг на первом запуске.
+- Мини-статистика: общее число прокрутов и последний результат.
+- Режим «Случайное колесо» с главного экрана.
+- История последних результатов в игровой сессии.
+- Шеринг результата в мессенджеры и соцсети.
 
-A few resources to get you started if this is your first Flutter project:
+## Технологии
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- Flutter / Dart
+- `flutter_fortune_wheel`
+- `confetti`
+- `shared_preferences`
+- `share_plus`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Локальный запуск
+
+### 1) Установи зависимости
+
+```bash
+flutter pub get
+```
+
+### 2) Запусти на Android-эмуляторе
+
+```bash
+flutter run
+```
+
+### 3) Релизная сборка APK
+
+```bash
+flutter build apk --release
+```
+
+## Структура проекта
+
+- `lib/main.dart` — основная логика приложения:
+  - `HomeScreen`: библиотека колес, статистика, быстрые действия.
+  - `GameScreen`: вращение, результат, история, шеринг.
+  - `EditScreen`: редактирование названия и пунктов колеса.
+
+## Продуктовый фокус (рост использования)
+
+### Приоритет P0
+
+1. Подключить аналитику событий (первый запуск, первый прокрут, создание колеса, шеринг).
+2. Добавить deep-link шеринг колеса (не только результата).
+3. Улучшить store listing (иконка, скриншоты, описание под use-cases).
+
+### Приоритет P1
+
+1. Сохранение «избранных» колес.
+2. Импорт/экспорт наборов (JSON).
+3. Тематические паки контента (party/date/office/kids).
+
+## Идеи на будущее
+
+- Режим для компании (очередность игроков, таймер, штрафы).
+- Daily-челленджи и ачивки.
+- Премиум-режим (без рекламы + расширенные шаблоны).
+
+## Важно
+
+Если команды Flutter не находятся, проверь:
+
+- что Flutter SDK добавлен в `PATH`;
+- что Android SDK/эмулятор корректно настроены;
+- что `flutter doctor` проходит без критичных ошибок.
